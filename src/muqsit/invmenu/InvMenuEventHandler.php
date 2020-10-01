@@ -22,9 +22,10 @@ declare(strict_types=1);
 namespace muqsit\invmenu;
 
 use muqsit\invmenu\session\PlayerManager;
+use pocketmine\event\inventory\InventoryCloseEvent;
 use pocketmine\event\inventory\InventoryTransactionEvent;
 use pocketmine\event\Listener;
-use pocketmine\event\player\PlayerJoinEvent;
+use pocketmine\event\player\PlayerLoginEvent;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\inventory\transaction\action\SlotChangeAction;
@@ -33,10 +34,10 @@ use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 class InvMenuEventHandler implements Listener{
 
 	/**
-	 * @param PlayerJoinEvent $event
-	 * @priority LOWEST
+	 * @param PlayerLoginEvent $event
+	 * @priority MONITOR
 	 */
-	public function onPlayerJoin(PlayerJoinEvent $event) : void{
+	public function onPlayerLogin(PlayerLoginEvent $event) : void{
 		PlayerManager::create($event->getPlayer());
 	}
 
@@ -51,12 +52,11 @@ class InvMenuEventHandler implements Listener{
 	/**
 	 * @param DataPacketReceiveEvent $event
 	 * @priority NORMAL
-	 * @ignoreCancelled true
 	 */
 	public function onDataPacketReceive(DataPacketReceiveEvent $event) : void{
 		$packet = $event->getPacket();
 		if($packet instanceof NetworkStackLatencyPacket){
-			$session = PlayerManager::get($event->getPlayer());
+			$session = PlayerManager::get($event->getOrigin()->getPlayer());
 			if($session !== null){
 				$session->getNetwork()->notify($packet->timestamp);
 			}
@@ -64,9 +64,23 @@ class InvMenuEventHandler implements Listener{
 	}
 
 	/**
+	 * @param InventoryCloseEvent $event
+	 * @priority MONITOR
+	 */
+	public function onInventoryClose(InventoryCloseEvent $event) : void{
+		$player = $event->getPlayer();
+		$session = PlayerManager::get($player);
+		if($session !== null){
+			$menu = $session->getCurrentMenu();
+			if($menu !== null && $event->getInventory() === $menu->getInventory()){
+				$menu->onClose($player);
+			}
+		}
+	}
+
+	/**
 	 * @param InventoryTransactionEvent $event
 	 * @priority NORMAL
-	 * @ignoreCancelled true
 	 */
 	public function onInventoryTransaction(InventoryTransactionEvent $event) : void{
 		$transaction = $event->getTransaction();
@@ -85,7 +99,7 @@ class InvMenuEventHandler implements Listener{
 						$network_stack_callbacks[] = $network_stack_callback;
 					}
 					if($result->isCancelled()){
-						$event->setCancelled();
+						$event->cancel();
 						break;
 					}
 				}

@@ -48,7 +48,7 @@ final class InvMenuTransactionResult{
 	 * @param Closure|null $callback
 	 * @return self
 	 *
-	 * @phpstan-param Closure(\pocketmine\Player) : void $callback
+	 * @phpstan-param Closure(\pocketmine\player\Player) : void $callback
 	 */
 	public function then(?Closure $callback) : self{
 		$this->post_transaction_callback = $callback;

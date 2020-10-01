@@ -24,20 +24,27 @@ namespace muqsit\invmenu;
 use Closure;
 use InvalidStateException;
 use muqsit\invmenu\inventory\InvMenuInventory;
+use muqsit\invmenu\inventory\SharedInvMenuSynchronizer;
 use muqsit\invmenu\metadata\MenuMetadata;
 use muqsit\invmenu\session\PlayerManager;
 use muqsit\invmenu\transaction\DeterministicInvMenuTransaction;
 use muqsit\invmenu\transaction\InvMenuTransaction;
 use muqsit\invmenu\transaction\InvMenuTransactionResult;
+use pocketmine\inventory\Inventory;
 use pocketmine\inventory\transaction\action\SlotChangeAction;
 use pocketmine\inventory\transaction\InventoryTransaction;
 use pocketmine\item\Item;
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 class InvMenu implements MenuIds{
 
-	public static function create(string $identifier) : InvMenu{
-		return new InvMenu(InvMenuHandler::getMenuType($identifier));
+	/**
+	 * @param string $identifier
+	 * @param mixed ...$args
+	 * @return InvMenu
+	 */
+	public static function create(string $identifier, ...$args) : InvMenu{
+		return new InvMenu(InvMenuHandler::getMenuType($identifier), ...$args);
 	}
 
 	/**
@@ -71,12 +78,16 @@ class InvMenu implements MenuIds{
 	/** @var InvMenuInventory */
 	protected $inventory;
 
-	public function __construct(MenuMetadata $type){
+	/** @var SharedInvMenuSynchronizer|null */
+	protected $synchronizer;
+
+	public function __construct(MenuMetadata $type, ?Inventory $custom_inventory = null){
 		if(!InvMenuHandler::isRegistered()){
 			throw new InvalidStateException("Tried creating menu before calling " . InvMenuHandler::class . "::register()");
 		}
 		$this->type = $type;
 		$this->inventory = $this->type->createInventory();
+		$this->setInventory($custom_inventory);
 	}
 
 	public function getType() : MenuMetadata{
@@ -107,7 +118,7 @@ class InvMenu implements MenuIds{
 	 * @param Closure|null $listener
 	 * @return self
 	 *
-	 * @phpstan-param Closure(Player, \pocketmine\inventory\Inventory) : void $listener
+	 * @phpstan-param Closure(Player, Inventory) : void $listener
 	 */
 	public function setInventoryCloseListener(?Closure $listener) : self{
 		$this->inventory_close_listener = $listener;
@@ -126,7 +137,7 @@ class InvMenu implements MenuIds{
 		$network = $session->getNetwork();
 		$network->dropPending();
 
-		$session->removeWindow();
+		$player->removeCurrentWindow();
 
 		$network->wait(function(bool $success) use($player, $session, $name, $callback) : void{
 			if($success){
@@ -145,6 +156,17 @@ class InvMenu implements MenuIds{
 		return $this->inventory;
 	}
 
+	public function setInventory(?Inventory $custom_inventory) : void{
+		if($this->synchronizer !== null){
+			$this->synchronizer->destroy();
+			$this->synchronizer = null;
+		}
+
+		if($custom_inventory !== null){
+			$this->synchronizer = new SharedInvMenuSynchronizer($this, $custom_inventory);
+		}
+	}
+
 	/**
 	 * @internal use InvMenu::send() instead.
 	 *
@@ -152,7 +174,7 @@ class InvMenu implements MenuIds{
 	 * @return bool
 	 */
 	public function sendInventory(Player $player) : bool{
-		return $player->addWindow($this->getInventory()) !== -1;
+		return $player->setCurrentWindow($this->getInventory());
 	}
 
 	public function handleInventoryTransaction(Player $player, Item $out, Item $in, SlotChangeAction $action, InventoryTransaction $transaction) : InvMenuTransactionResult{

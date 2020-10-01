@@ -22,15 +22,16 @@ declare(strict_types=1);
 namespace muqsit\invmenu;
 
 use InvalidArgumentException;
-use InvalidStateException;
 use muqsit\invmenu\metadata\DoubleBlockMenuMetadata;
 use muqsit\invmenu\metadata\MenuMetadata;
 use muqsit\invmenu\metadata\SingleBlockMenuMetadata;
-use pocketmine\block\BlockFactory;
-use pocketmine\block\BlockIds;
-use pocketmine\network\mcpe\protocol\types\WindowTypes;
+use muqsit\invmenu\session\network\handler\PlayerNetworkHandlerRegistry;
+use pocketmine\block\tile\Chest;
+use pocketmine\block\tile\Hopper;
+use pocketmine\block\tile\TileFactory;
+use pocketmine\block\VanillaBlocks;
+use pocketmine\network\mcpe\protocol\types\inventory\WindowTypes;
 use pocketmine\plugin\Plugin;
-use pocketmine\tile\Tile;
 
 final class InvMenuHandler{
 
@@ -40,7 +41,7 @@ final class InvMenuHandler{
 	/** @var MenuMetadata[] */
 	private static $menu_types = [];
 
-	public static function getRegistrant() : ?Plugin{
+	public static function getRegistrant() : Plugin{
 		return self::$registrant;
 	}
 
@@ -51,6 +52,7 @@ final class InvMenuHandler{
 
 		self::$registrant = $plugin;
 		self::registerDefaultMenuTypes();
+		PlayerNetworkHandlerRegistry::init();
 		$plugin->getServer()->getPluginManager()->registerEvents(new InvMenuEventHandler(), $plugin);
 	}
 
@@ -59,9 +61,10 @@ final class InvMenuHandler{
 	}
 
 	private static function registerDefaultMenuTypes() : void{
-		self::registerMenuType(new SingleBlockMenuMetadata(InvMenu::TYPE_CHEST, 27, WindowTypes::CONTAINER, BlockFactory::get(BlockIds::CHEST), Tile::CHEST));
-		self::registerMenuType(new DoubleBlockMenuMetadata(InvMenu::TYPE_DOUBLE_CHEST, 54, WindowTypes::CONTAINER, BlockFactory::get(BlockIds::CHEST), Tile::CHEST));
-		self::registerMenuType(new SingleBlockMenuMetadata(InvMenu::TYPE_HOPPER, 5, WindowTypes::HOPPER, BlockFactory::get(BlockIds::HOPPER_BLOCK), "Hopper"));
+		$tile_factory = TileFactory::getInstance();
+		self::registerMenuType(new SingleBlockMenuMetadata(InvMenu::TYPE_CHEST, 27, WindowTypes::CONTAINER, VanillaBlocks::CHEST(), $tile_factory->getSaveId(Chest::class)));
+		self::registerMenuType(new DoubleBlockMenuMetadata(InvMenu::TYPE_DOUBLE_CHEST, 54, WindowTypes::CONTAINER, VanillaBlocks::CHEST(), $tile_factory->getSaveId(Chest::class)));
+		self::registerMenuType(new SingleBlockMenuMetadata(InvMenu::TYPE_HOPPER, 5, WindowTypes::HOPPER, VanillaBlocks::HOPPER(), $tile_factory->getSaveId(Hopper::class)));
 	}
 
 	public static function registerMenuType(MenuMetadata $type, bool $override = false) : void{

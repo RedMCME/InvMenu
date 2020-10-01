@@ -24,7 +24,7 @@ namespace muqsit\invmenu\transaction;
 use pocketmine\inventory\transaction\action\SlotChangeAction;
 use pocketmine\inventory\transaction\InventoryTransaction;
 use pocketmine\item\Item;
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 class InvMenuTransaction{
 

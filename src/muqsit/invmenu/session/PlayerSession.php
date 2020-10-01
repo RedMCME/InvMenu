@@ -22,12 +22,10 @@ declare(strict_types=1);
 namespace muqsit\invmenu\session;
 
 use Closure;
-use InvalidArgumentException;
-use InvalidStateException;
 use muqsit\invmenu\InvMenu;
-use muqsit\invmenu\InvMenuHandler;
-use pocketmine\network\mcpe\protocol\types\ContainerIds;
-use pocketmine\Player;
+use muqsit\invmenu\session\network\PlayerNetwork;
+use pocketmine\network\mcpe\protocol\ContainerOpenPacket;
+use pocketmine\player\Player;
 
 class PlayerSession{
 
@@ -43,12 +41,9 @@ class PlayerSession{
 	/** @var InvMenu|null */
 	protected $current_menu;
 
-	/** @var int */
-	protected $current_window_id = ContainerIds::NONE;
-
-	public function __construct(Player $player){
+	public function __construct(Player $player, PlayerNetwork $network){
 		$this->player = $player;
-		$this->network = new PlayerNetwork($player);
+		$this->network = $network;
 		$this->menu_extradata = new MenuExtradata();
 	}
 
@@ -57,39 +52,13 @@ class PlayerSession{
 	 */
 	public function finalize() : void{
 		if($this->current_menu !== null){
-			$this->removeWindow();
+			$this->player->removeCurrentWindow();
 		}
 		$this->network->dropPending();
 	}
 
-	public function removeWindow() : void{
-		$window = $this->player->getWindow($this->current_window_id);
-		if($window !== null){
-			$this->player->removeWindow($window);
-			$this->network->wait(static function(bool $success) : void{});
-		}
-		$this->current_window_id = ContainerIds::NONE;
-	}
-
 	public function getMenuExtradata() : MenuExtradata{
 		return $this->menu_extradata;
-	}
-
-	private function sendWindow() : bool{
-		$this->removeWindow();
-
-		try{
-			$position = $this->menu_extradata->getPosition();
-			$inventory = $this->current_menu->getInventory();
-			/** @noinspection NullPointerExceptionInspection */
-			$inventory->moveTo($position->x, $position->y, $position->z);
-			$this->current_window_id = $this->player->addWindow($inventory);
-		}catch(InvalidStateException | InvalidArgumentException $e){
-			InvMenuHandler::getRegistrant()->getLogger()->debug("InvMenu failed to send inventory to {$this->player->getName()} due to: {$e->getMessage()}");
-			$this->removeWindow();
-		}
-
-		return $this->current_window_id !== ContainerIds::NONE;
 	}
 
 	/**
@@ -102,18 +71,30 @@ class PlayerSession{
 		$this->current_menu = $menu;
 
 		if($this->current_menu !== null){
-			$this->network->wait(function(bool $success) use($callback) : void{
+			$this->network->waitUntil($this->network->getGraphicWaitDuration(), function(bool $success) use ($callback) : void{
 				if($this->current_menu !== null){
-					if($success && $this->sendWindow()){
-						if($callback !== null){
-							$callback(true);
+					if($success && $this->current_menu->sendInventory($this->player)){
+						// TODO: Revert this to the Inventory->moveTo() method when it's possible
+						// for plugins to specify network type for inventories
+						if($this->player->getNetworkSession()->sendDataPacket(ContainerOpenPacket::blockInvVec3(
+							$this->player->getNetworkSession()->getInvManager()->getCurrentWindowId(),
+							$this->current_menu->getType()->getWindowType(),
+							$this->menu_extradata->getPosition()
+						))){
+							$this->player->getNetworkSession()->getInvManager()->syncContents($this->current_menu->getInventory());
+							if($callback !== null){
+								$callback(true);
+							}
+							return;
 						}
-						return;
+						$this->player->removeCurrentWindow();
+					}else{
+						$this->removeCurrentMenu();
 					}
-					$this->removeCurrentMenu();
-				}
-				if($callback !== null){
-					$callback(false);
+
+					if($callback !== null){
+						$callback(false);
+					}
 				}
 			});
 		}else{
@@ -130,7 +111,7 @@ class PlayerSession{
 	}
 
 	/**
-	 * @internal use Player::removeWindow() instead
+	 * @internal use Player::removeCurrentWindow() instead
 	 * @return bool
 	 */
 	public function removeCurrentMenu() : bool{

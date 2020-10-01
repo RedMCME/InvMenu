@@ -24,15 +24,14 @@ namespace muqsit\invmenu\metadata;
 use muqsit\invmenu\session\MenuExtradata;
 use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 class DoubleBlockMenuMetadata extends SingleBlockMenuMetadata{
 
 	protected function getBlockActorDataAt(Vector3 $pos, ?string $name) : CompoundTag{
-		$tag = parent::getBlockActorDataAt($pos, $name);
-		$tag->setInt("pairx", $pos->x + (($pos->x & 1) ? 1 : -1));
-		$tag->setInt("pairz", $pos->z);
-		return $tag;
+		return parent::getBlockActorDataAt($pos, $name)
+			->setInt("pairx", (int) ($pos->x + (($pos->x & 1) ? 1 : -1)))
+			->setInt("pairz", (int) $pos->z);
 	}
 
 	protected function getBlockPositions(MenuExtradata $metadata) : array{

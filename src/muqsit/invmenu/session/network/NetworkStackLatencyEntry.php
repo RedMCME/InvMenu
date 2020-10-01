@@ -19,14 +19,20 @@
 
 declare(strict_types=1);
 
-namespace muqsit\invmenu\inventory;
+namespace muqsit\invmenu\session\network;
 
-use pocketmine\block\inventory\BlockInventory;
-use pocketmine\world\Position;
+use Closure;
 
-class InvMenuInventory extends BlockInventory{
+final class NetworkStackLatencyEntry{
 
-	public function __construct(int $size){
-		parent::__construct(new Position(0, 0, 0, null), $size);
+	/** @var int */
+	public $timestamp;
+
+	/** @var Closure */
+	public $then;
+
+	public function __construct(int $timestamp, Closure $then){
+		$this->timestamp = $timestamp;
+		$this->then = $then;
 	}
 }

@@ -23,19 +23,18 @@ namespace muqsit\invmenu\metadata;
 
 use muqsit\invmenu\session\MenuExtradata;
 use pocketmine\block\Block;
+use pocketmine\block\tile\Nameable;
+use pocketmine\block\tile\Spawnable;
+use pocketmine\block\tile\Tile;
 use pocketmine\math\Vector3;
-use pocketmine\nbt\NetworkLittleEndianNBTStream;
 use pocketmine\nbt\tag\CompoundTag;
+use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\BlockActorDataPacket;
+use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
-use pocketmine\Player;
-use pocketmine\tile\Nameable;
-use pocketmine\tile\Tile;
+use pocketmine\player\Player;
 
 class SingleBlockMenuMetadata extends MenuMetadata{
-
-	/** @var NetworkLittleEndianNBTStream */
-	protected static $serializer;
 
 	/** @var Block */
 	protected $block;
@@ -51,11 +50,6 @@ class SingleBlockMenuMetadata extends MenuMetadata{
 
 	public function __construct(string $identifier, int $size, int $window_type, Block $block, string $tile_id){
 		parent::__construct($identifier, $size, $window_type);
-
-		if(self::$serializer === null){
-			self::$serializer = new NetworkLittleEndianNBTStream();
-		}
-
 		$this->block = $block;
 		$this->tile_id = $tile_id;
 	}
@@ -63,34 +57,28 @@ class SingleBlockMenuMetadata extends MenuMetadata{
 	public function sendGraphic(Player $player, MenuExtradata $metadata) : void{
 		$positions = $this->getBlockPositions($metadata);
 		$name = $metadata->getName();
+		$network = $player->getNetworkSession();
+		$block_runtime_id = RuntimeBlockMapping::getInstance()->toRuntimeId($this->block->getFullId());
 		foreach($positions as $pos){
-			$packet = new UpdateBlockPacket();
-			$packet->x = $pos->x;
-			$packet->y = $pos->y;
-			$packet->z = $pos->z;
-			$packet->blockRuntimeId = $this->block->getRuntimeId();
-			$packet->flags = UpdateBlockPacket::FLAG_NETWORK;
-			$player->sendDataPacket($packet);
-			$player->sendDataPacket($this->getBlockActorDataPacketAt($player, $pos, $name));
+			$network->sendDataPacket(UpdateBlockPacket::create($pos->x, $pos->y, $pos->z, $block_runtime_id));
+			$network->sendDataPacket($this->getBlockActorDataPacketAt($player, $pos, $name));
 		}
 	}
 
 	protected function getBlockActorDataPacketAt(Player $player, Vector3 $pos, ?string $name) : BlockActorDataPacket{
-		$packet = new BlockActorDataPacket();
-		$packet->x = $pos->x;
-		$packet->y = $pos->y;
-		$packet->z = $pos->z;
-
-		$namedtag = self::$serializer->write($this->getBlockActorDataAt($pos, $name));
-		assert($namedtag !== false);
-
-		$packet->namedtag = $namedtag;
-		return $packet;
+		return BlockActorDataPacket::create(
+			$pos->x,
+			$pos->y,
+			$pos->z,
+			new CacheableNbt($this->getBlockActorDataAt($pos, $name))
+		);
 	}
 
 	protected function getBlockActorDataAt(Vector3 $pos, ?string $name) : CompoundTag{
-		$tag = new CompoundTag();
-		$tag->setString(Tile::TAG_ID, $this->tile_id);
+		$tag = CompoundTag::create()->setString(Tile::TAG_ID, $this->tile_id);
+		$tag->setInt(Tile::TAG_X, $pos->x);
+		$tag->setInt(Tile::TAG_Y, $pos->y);
+		$tag->setInt(Tile::TAG_Z, $pos->z);
 		if($name !== null){
 			$tag->setString(Nameable::TAG_CUSTOM_NAME, $name);
 		}
@@ -98,15 +86,17 @@ class SingleBlockMenuMetadata extends MenuMetadata{
 	}
 
 	public function removeGraphic(Player $player, MenuExtradata $extradata) : void{
-		$level = $player->getLevel();
-		foreach($this->getBlockPositions($extradata) as $pos){
-			$packet = new UpdateBlockPacket();
-			$packet->x = $pos->x;
-			$packet->y = $pos->y;
-			$packet->z = $pos->z;
-			$packet->blockRuntimeId = $level->getBlockAt($pos->x, $pos->y, $pos->z)->getRuntimeId();
-			$packet->flags = UpdateBlockPacket::FLAG_NETWORK;
-			$player->sendDataPacket($packet, false, true);
+		$network = $player->getNetworkSession();
+		$world = $player->getWorld();
+		$runtime_block_mapping = RuntimeBlockMapping::getInstance();
+		foreach($this->getBlockPositions($extradata) as $position){
+			$block = $world->getBlockAt($position->x, $position->y, $position->z);
+			$network->sendDataPacket(UpdateBlockPacket::create($position->x, $position->y, $position->z, $runtime_block_mapping->toRuntimeId($block->getFullId())), true);
+
+			$tile = $world->getTileAt($position->x, $position->y, $position->z);
+			if($tile instanceof Spawnable){
+				$network->sendDataPacket(BlockActorDataPacket::create($position->x, $position->y, $position->z, $tile->getSerializedSpawnCompound()), true);
+			}
 		}
 	}
 

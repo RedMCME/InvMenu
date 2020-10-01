@@ -19,14 +19,26 @@
 
 declare(strict_types=1);
 
-namespace muqsit\invmenu\inventory;
+namespace muqsit\invmenu\session\network\handler;
 
-use pocketmine\block\inventory\BlockInventory;
-use pocketmine\world\Position;
+use Closure;
+use muqsit\invmenu\session\network\NetworkStackLatencyEntry;
 
-class InvMenuInventory extends BlockInventory{
+final class ClosurePlayerNetworkHandler implements PlayerNetworkHandler{
 
-	public function __construct(int $size){
-		parent::__construct(new Position(0, 0, 0, null), $size);
+	/** @var Closure */
+	private $creator;
+
+	/**
+	 * @param Closure $creator
+	 *
+	 * @phpstan-param Closure(Closure) : NetworkStackLatencyEntry
+	 */
+	public function __construct(Closure $creator){
+		$this->creator = $creator;
+	}
+
+	public function createNetworkStackLatencyEntry(Closure $then) : NetworkStackLatencyEntry{
+		return ($this->creator)($then);
 	}
 }

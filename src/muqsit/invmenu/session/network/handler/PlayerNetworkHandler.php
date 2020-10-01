@@ -19,14 +19,12 @@
 
 declare(strict_types=1);
 
-namespace muqsit\invmenu\inventory;
+namespace muqsit\invmenu\session\network\handler;
 
-use pocketmine\block\inventory\BlockInventory;
-use pocketmine\world\Position;
+use Closure;
+use muqsit\invmenu\session\network\NetworkStackLatencyEntry;
 
-class InvMenuInventory extends BlockInventory{
+interface PlayerNetworkHandler{
 
-	public function __construct(int $size){
-		parent::__construct(new Position(0, 0, 0, null), $size);
-	}
+	public function createNetworkStackLatencyEntry(Closure $then) : NetworkStackLatencyEntry;
 }

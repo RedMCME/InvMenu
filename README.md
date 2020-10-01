@@ -6,6 +6,8 @@
 You can get the compiled .phar file on poggit by clicking [here](https://poggit.pmmp.io/ci/Muqsit/InvMenu/~).
 
 ## Usage
+InvMenu supports creating a GUI out of any kind of `Inventory`.
+
 **NOTE:** You MUST register `InvMenuHandler` during plugin enable before you can begin creating `InvMenu` instances.
 ```php
 if(!InvMenuHandler::isRegistered()){
@@ -133,7 +135,7 @@ Based on your use-case, you may find one better than the other. While `Method #1
 A few actions are impossible to be done at the time a player is viewing an inventory, such as sending a form — a player won't be able to view a form while viewing an inventory. To do this, you will need to close the menu inventory and make sure they've closed it by waiting for a response from their side. You can do this by supplying a callback to `InvMenuTransactionResult::then()`.
 ```php
 $menu->setListener(function(InvMenuTransaction $transaction) : InvMenuTransactionResult{
-	$transaction->getPlayer()->removeWindow($transaction->getAction()->getInventory());
+	$transaction->getPlayer()->removeCurrentWindow();
 	return $transaction->discard()->then(function(Player $player) : void{ // $player === $transaction->getPlayer()
 		// assert($player->isOnline());
 		$player->sendForm(new Form());
@@ -142,7 +144,7 @@ $menu->setListener(function(InvMenuTransaction $transaction) : InvMenuTransactio
 ```
 ```php
 $menu->setListener(InvMenu::readonly(function(DeterministicInvMenuTransaction $transaction) : void{
-	$transaction->getPlayer()->removeWindow($transaction->getAction()->getInventory());
+	$transaction->getPlayer()->removeCurrentWindow();
 	$transaction->then(function(Player $player) : void{
 		$player->sendForm(new Form());
 	});
@@ -166,8 +168,8 @@ Closure(Player $player, Inventory $inventory) : void;
 ```
 To forcefully close or remove the menu from a player, you can use
 ```php
-/** @var InvMenuTransaction $transaction */
-$transaction->getPlayer()->removeWindow($transaction->getAction()->getInventory());
+/** @var Player $player */
+$player->removeCurrentWindow();
 ```
 
 ## Writing a custom inventory class
@@ -194,5 +196,5 @@ $menu = InvMenu::create(self::TYPE_DISPENSER);
 ```
 
 ## InvMenu Wiki
-Applications, examples, tutorials and featured projects using InvMenu can be found on the [InvMenu Wiki](https://github.com/Muqsit/InvMenu/wiki).
+Applications, examples, tutorials and featured projects using InvMenu can be found on the [InvMenu Wiki](https://github.com/Muqsit/InvMenu/wiki/InvMenu-v4.0).
 
