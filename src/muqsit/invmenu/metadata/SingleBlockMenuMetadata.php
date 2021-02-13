@@ -29,6 +29,8 @@ use pocketmine\block\tile\Tile;
 use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use pocketmine\network\mcpe\convert\RuntimeBlockMapping408;
+use pocketmine\network\mcpe\convert\RuntimeBlockMapping422;
 use pocketmine\network\mcpe\protocol\BlockActorDataPacket;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
@@ -60,7 +62,11 @@ class SingleBlockMenuMetadata extends MenuMetadata{
 		if(count($positions) > 0){
 			$name = $metadata->getName();
 			$network = $player->getNetworkSession();
-			$block_runtime_id = RuntimeBlockMapping::getInstance()->toRuntimeId($this->block->getFullId());
+			$mapping = RuntimeBlockMapping422::getInstance();
+			if ($player->getNetworkSession()->getPlayerInfo()->getProtocol() === 408) {
+			    $mapping = RuntimeBlockMapping408::getInstance();
+            }
+			$block_runtime_id = $mapping->toRuntimeId($this->block->getFullId());
 			foreach($positions as $pos){
 				$network->sendDataPacket(UpdateBlockPacket::create($pos->x, $pos->y, $pos->z, $block_runtime_id));
 				$network->sendDataPacket($this->getBlockActorDataPacketAt($player, $pos, $name));
@@ -93,7 +99,11 @@ class SingleBlockMenuMetadata extends MenuMetadata{
 	public function removeGraphic(Player $player, MenuExtradata $extradata) : void{
 		$network = $player->getNetworkSession();
 		$world = $player->getWorld();
-		$runtime_block_mapping = RuntimeBlockMapping::getInstance();
+        $runtime_block_mapping = RuntimeBlockMapping422::getInstance();
+        if ($player->getNetworkSession()->getPlayerInfo()->getProtocol() === 408) {
+            $runtime_block_mapping = RuntimeBlockMapping408::getInstance();
+        }
+
 		foreach($this->getBlockPositions($extradata) as $position){
 			$block = $world->getBlockAt($position->x, $position->y, $position->z);
 			$network->sendDataPacket(UpdateBlockPacket::create($position->x, $position->y, $position->z, $runtime_block_mapping->toRuntimeId($block->getFullId())), true);
