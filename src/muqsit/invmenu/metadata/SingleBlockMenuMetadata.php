@@ -28,8 +28,6 @@ use pocketmine\block\tile\Spawnable;
 use pocketmine\block\tile\Tile;
 use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping408;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping422;
 use pocketmine\network\mcpe\protocol\BlockActorDataPacket;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
@@ -61,13 +59,9 @@ class SingleBlockMenuMetadata extends MenuMetadata{
 		if(count($positions) > 0){
 			$name = $metadata->getName();
 			$network = $player->getNetworkSession();
-			$mapping = RuntimeBlockMapping422::getInstance();
-			if ($player->getNetworkSession()->getPlayerInfo()->getProtocol() === 408) {
-			    $mapping = RuntimeBlockMapping408::getInstance();
-            }
-			$block_runtime_id = $mapping->toRuntimeId($this->block->getFullId());
+
 			foreach($positions as $pos){
-				$network->sendDataPacket(UpdateBlockPacket::create($pos->x, $pos->y, $pos->z, $block_runtime_id));
+				$network->sendDataPacket(UpdateBlockPacket::create($pos->x, $pos->y, $pos->z, $this->block->getFullId()));
 				$network->sendDataPacket($this->getBlockActorDataPacketAt($player, $pos, $name));
 			}
 			return true;
